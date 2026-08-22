@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to WebReflex! 🎉
 
-WebReflex is an open-source, deterministic, self-healing action cache and execution engine for AI browser agents. We welcome contributions across the core Rust engine, Python/TS SDKs, browser extensions, and documentation.
+WebReflex is an open-source, deterministic, self-healing action cache and execution engine for AI browser agents, maintained by [EntropyParadox Lab](https://github.com/entropyparadox-lab). We welcome contributions across the core Rust engine, Python/TS SDKs, browser extensions, and documentation.
 
 ---
 
@@ -17,7 +17,7 @@ WebReflex is an open-source, deterministic, self-healing action cache and execut
 ### 1. Clone and Build Core Engine
 
 ```bash
-git clone https://github.com/cycorld/web-reflex.git
+git clone https://github.com/entropyparadox-lab/web-reflex.git
 cd web-reflex
 
 # Check and build Rust workspace
@@ -45,10 +45,10 @@ playwright install chromium
 web-reflex/
 ├── crates/
 │   ├── core/         # DOM Sanitizer, Skeleton Hasher (SHA-256), Models
-│   ├── storage/      # SQLite Action Graph Storage (rusqlite)
+│   ├── storage/      # SQLite Action Graph Storage (WAL mode, rusqlite)
 │   ├── engine/       # Replay Engine, Safety Gate, Self-Healing Manager
 │   └── cli/          # web-reflex CLI & Local Axum HTTP Server
-├── python/           # Python SDK (web_reflex.ReflexSession, client)
+├── python/           # Python SDK (web_reflex.ReflexSession, client, healers)
 ├── tests/            # Live Playwright browser E2E test suite
 ├── SPEC.md           # Architecture specifications & schema
 ├── README.md         # Project documentation
@@ -81,8 +81,8 @@ pytest -v tests/test_live_playwright.py
 
 When writing code for WebReflex, please adhere to these core tenets:
 
-1. **Zero-PII Storage**: Never store sensitive values, input text, tokens, or emails into the Action Graph database. Always parameterize variable inputs into `$SLOT` placeholders.
-2. **Deterministic Fast-Path**: The core replay path must execute in under 50ms without invoking network LLM calls.
+1. **Zero-PII Architecture**: Never store sensitive values, input text, tokens, or emails into the Action Graph database. Always parameterize variable inputs into `$SLOT` placeholders.
+2. **Deterministic Fast-Path**: The core replay path must execute in under 50ms without invoking network LLM calls on warm cache hits.
 3. **Fail-Closed Safety Gate**: Any action that modifies data (`mutating_write`, checkout, deletion, transfers) must default to requiring explicit confirmation.
 4. **Clean Hand-off on Failure**: When a selector fails, do not repeat completed steps. Provide a minimal bounded context snippet for the LLM to heal only the broken node.
 
@@ -102,4 +102,4 @@ When writing code for WebReflex, please adhere to these core tenets:
 
 ## 🔒 Reporting Security Issues
 
-If you discover a security vulnerability or potential PII leak vector, please do **not** open a public GitHub issue. Instead, report it privately to the maintainers at `security@cycorld.com` or via GitHub Private Vulnerability Reporting.
+If you discover a security vulnerability or potential PII leak vector, please do **not** open a public GitHub issue. Instead, report it privately to the maintainers at `security@entropyparadox.com` or via GitHub Private Vulnerability Reporting.

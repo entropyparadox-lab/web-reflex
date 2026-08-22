@@ -76,6 +76,9 @@ fn test_end_to_end_fast_path_and_self_healing() -> Result<()> {
                 SafetyVerdict::RequiresApproval { .. }
             ));
         }
+        FastPathResult::DomainCandidate { .. } => {
+            panic!("Expected exact cache HIT on initial page")
+        }
         FastPathResult::Miss { .. } => panic!("Expected cache HIT on initial page"),
     }
 

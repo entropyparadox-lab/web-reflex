@@ -1,4 +1,5 @@
 from web_reflex.client import ReflexClient
+from web_reflex.healers import create_llm_healer
 from web_reflex.models import (
     ActionGraph,
     ActionNode,
@@ -12,6 +13,7 @@ __all__ = [
     "ReflexClient",
     "ReflexSession",
     "ReflexSafetyError",
+    "create_llm_healer",
     "ActionGraph",
     "ActionNode",
     "ActionType",
