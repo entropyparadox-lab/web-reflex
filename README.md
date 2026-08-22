@@ -1,37 +1,174 @@
 # WebReflex (OpenReflex)
 
-> **Deterministic, Instant, and Self-Healing Action Engine for AI Browser Agents**
+<div align="center">
 
-WebReflex is a high-performance semantic action cache and self-healing execution layer for AI web agents (Playwright, Puppeteer, Browser-use).
+**Deterministic, Instant, and Self-Healing Action Cache for AI Web Agents**
 
----
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org)
+[![Playwright](https://img.shields.io/badge/playwright-supported-green.svg)](https://playwright.dev)
 
-## 🎯 The Core Problem
+*Don't think every step. Just reflex.*
 
-1. **AI Browser Agents (LLMs/VLMs)**: Think on every single step. They cost thousands of tokens, take 2–5 seconds per step, and suffer from occasional hallucinations.
-2. **Traditional RPA/Playwright Scripts**: Run in 0.01 seconds at 0 cost, but break completely whenever a website modifies a single CSS class or DOM structure.
-
----
-
-## 💡 The WebReflex Solution
-
-- **Instant Reflex (95% of runs)**: If the action path is cached, execute deterministically via pure Playwright / CDP in <50ms at **$0 token cost**.
-- **Self-Healing (5% on UI changes)**: If a selector or step breaks due to UI changes / A/B tests, the LLM intercepts the dirty state, fixes the broken selector chain, and updates the local cache.
-- **Local-First & Zero-Leak**: Action graphs are stored in local SQLite as parameterized templates without sensitive user data (PII).
-- **Safety Gate**: Strict isolation between `Read-Only` (safe auto-healing) and `Mutating` (human approval gate required for destructive actions).
+</div>
 
 ---
 
-## 📁 Repository Structure (Phase 1)
+## ⚡ Why WebReflex?
+
+Today's AI web automation ecosystem suffers from an extreme dichotomy:
+
+| Approach | Latency | Token Cost | Fragility on UI Changes |
+| :--- | :--- | :--- | :--- |
+| **Traditional RPA / Hardcoded Scripts** | ~50ms | $0 | 💥 **Breaks on 1px CSS change** |
+| **VLM / Raw LLM Agents** (Browser-use, etc.) | 2,000–5,000ms | $$$ (thousands of tokens/step) | 🐢 **Extremely slow & costly** |
+| **🚀 WebReflex (Reflex Cache + Self-Healing)** | **~40ms** | **$0** (95% of runs) | 🛡️ **Auto-heals via LLM when broken** |
+
+WebReflex acts as an intelligent, high-speed execution cache between your AI Agent and browser automation drivers (Playwright, Puppeteer, CDP):
+
+1. **Instant Reflex (95% of runs)**: If a page skeleton matches a recorded action recipe, execute deterministically via native browser selectors in **<45ms with 0 LLM token cost**.
+2. **Self-Healing Loop (5% on UI changes)**: If a button ID or CSS class breaks due to A/B tests or site updates, WebReflex intercepts the dirty state, triggers the LLM only for the broken selector, automatically patches the database to `v+1`, and resumes without repeating prior steps.
+3. **Local-First & Zero-Leak**: Action graphs are stored in local SQLite as parameterized templates (`$SLOTS`). No personal user data (PII) or sensitive tokens are stored.
+4. **Safety Gate Isolation**: Strict programmatic distinction between `read_only` actions (safe for autonomous execution) and `mutating_write` actions (requiring human-in-the-loop approval).
+
+---
+
+## 🏗️ Architecture
 
 ```
-web-reflex/
-├── README.md
-├── SPEC.md
-├── crates/ (or src/)
-│   ├── core/         # a11y DOM Sanitizer & Skeleton Hash Engine
-│   ├── storage/      # Local SQLite Action Graph Cache
-│   ├── engine/       # Deterministic Replay & Hand-off State Machine
-│   └── healing/      # LLM Self-Healing & Patch Resolver
-└── tests/            # E2E Dynamic UI Mutation Tests
++-------------------------------------------------------------+
+|                        AI Web Agent                         |
+|             (e.g., Goal: "Search for RTX 5090 and order")   |
++-------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|                      WebReflex Engine                       |
+|                                                             |
+|  1. Sanitize DOM & Compute Skeleton Hash (SHA-256)          |
+|  2. Query Local SQLite Action Cache                         |
+|                                                             |
+|   [HIT: 95% (40ms)]                           [MISS / FAIL] |
+|        |                                           |        |
+|        v                                           v        |
+|  +---------------------+                 +----------------+ |
+|  | Fast-Path Replay    |                 | LLM Self-Heal  | |
+|  | ($0 Token Cost)     |                 | (Hand-off ctx) | |
+|  +---------------------+                 +----------------+ |
+|        |                                           |        |
+|        |                                           v        |
+|        |                                 +----------------+ |
+|        |                                 | Auto-Patch DB  | |
+|        |                                 | (Version += 1) | |
+|        |                                 +----------------+ |
++--------+-------------------------------------------+--------+
+         |                                           |
+         +--------------------+----------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|                 Playwright / Target Website                 |
++-------------------------------------------------------------+
 ```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Build and Run the Local Daemon (Rust)
+
+```bash
+# Clone repository
+git clone https://github.com/cycorld/web-reflex.git
+cd web-reflex
+
+# Build release binary
+cargo build --release
+
+# Start local HTTP/REST daemon (default port: 9199)
+./target/release/web-reflex serve --port 9199 --db reflex.db
+```
+
+### 2. Python SDK & Playwright Integration
+
+Install the Python SDK:
+
+```bash
+cd python
+pip install -e .
+```
+
+Use `ReflexSession` with Playwright:
+
+```python
+from playwright.sync_api import sync_playwright
+from web_reflex import ReflexSession
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    page.goto("https://example-shop.com/checkout")
+
+    # Initialize Reflex Session with optional LLM Self-Healer callback
+    session = ReflexSession(
+        page,
+        endpoint="http://127.0.0.1:9199",
+        llm_healer=lambda ctx: my_llm_fix_selector(ctx) # Called only if UI breaks
+    )
+
+    # 1. Fast-Path Execution (Runs in ~40ms on cached pages)
+    result = session.execute(value_slots={"COUPON": "SAVE50"})
+    print(f"Status: {result['status']}, Elapsed: {result.get('elapsed_ms')}ms")
+
+    browser.close()
+```
+
+---
+
+## 🛡️ Safety Gate: Read vs Write Isolation
+
+WebReflex enforces safety levels on every action node:
+
+* `read_only` / `idempotent`: Data extraction, search inputs, navigating tabs. Auto-executed without interruption.
+* `mutating_write`: Checkout submission, deletion, payment, bank transfer.
+  * WebReflex will trigger `approval_callback(node)` before clicking.
+  * If no approval is given, execution is blocked with `ReflexSafetyError`.
+
+---
+
+## 🧪 Testing & Verification
+
+WebReflex comes with a comprehensive test suite including Rust unit/integration tests and real headless Chromium Playwright tests:
+
+```bash
+# Run all Rust tests
+cargo test --workspace
+
+# Run Live Playwright E2E simulation (Fast-Path -> UI Mutation -> Self-Healing)
+pytest -v tests/test_live_playwright.py
+```
+
+### Verified Benchmark Output
+
+```text
+[Run 1] Fast-Path Hit:        44.66ms   (0 LLM tokens, 100% deterministic)
+[Run 2] Self-Healed to v2:   1,054.81ms (UI Mutation caught -> Healed via LLM hook)
+[Run 3] Direct v2 Hit:        41.57ms   (Direct fast-path replay on new layout)
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [x] **v0.1.0 Core**: Rust DOM Sanitizer, Skeleton Hasher (SHA-256), SQLite Action Cache.
+- [x] **v0.1.0 Daemon & SDK**: Axum REST server, Python Playwright `ReflexSession`, Self-Healing Hand-off.
+- [ ] **v0.2.0 Extensions**: Chrome Extension SidePanel for visual 1-click recording & replay.
+- [ ] **v0.3.0 Ecosystem**: TypeScript / Node.js SDK for Stagehand & Browser-use plugins.
+- [ ] **v0.4.0 Team Sync**: End-to-end encrypted tenant sync for private enterprise backoffices.
+
+---
+
+## 📄 License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
