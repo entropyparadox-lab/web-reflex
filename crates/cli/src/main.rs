@@ -66,7 +66,10 @@ async fn main() -> Result<()> {
 
             match engine.inspect_page(&html)? {
                 FastPathResult::Hit(graph) => {
-                    println!("🎯 Cache HIT: Graph '{}' (v{})", graph.graph_id, graph.version);
+                    println!(
+                        "🎯 Cache HIT: Graph '{}' (v{})",
+                        graph.graph_id, graph.version
+                    );
                     println!("Nodes: {}", graph.nodes.len());
                 }
                 FastPathResult::DomainCandidate {
