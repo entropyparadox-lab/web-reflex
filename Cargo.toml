@@ -10,8 +10,10 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Cycorld <cycorld@users.noreply.github.com>"]
+authors = ["Entropy Paradox Lab <contact@entropyparadox.com>"]
 license = "Apache-2.0"
+repository = "https://github.com/entropyparadox-lab/web-reflex"
+homepage = "https://github.com/entropyparadox-lab/web-reflex"
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }

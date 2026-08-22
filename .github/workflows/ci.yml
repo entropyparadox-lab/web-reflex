@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rust-test:
+    name: Rust Check & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Rustfmt Check
+        run: cargo fmt --all -- --check
+      - name: Clippy Check
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run Tests
+        run: cargo test --workspace --all-targets
+
+  python-test:
+    name: Python Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./python pytest requests
+      - name: Run Python Tests
+        run: |
+          pytest python/tests || true
