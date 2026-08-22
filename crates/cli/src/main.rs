@@ -1,6 +1,9 @@
+pub mod server;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::fs;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use web_reflex_core::SkeletonHasher;
@@ -30,6 +33,18 @@ enum Commands {
         #[arg(short, long)]
         db: Option<PathBuf>,
     },
+    /// Start the WebReflex local HTTP/REST daemon
+    Serve {
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port to listen on
+        #[arg(short, long, default_value_t = 9199)]
+        port: u16,
+        /// SQLite database file path
+        #[arg(short, long, default_value = "reflex.db")]
+        db: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -54,10 +69,24 @@ async fn main() -> Result<()> {
                     println!("🎯 Cache HIT: Graph '{}' (v{})", graph.graph_id, graph.version);
                     println!("Nodes: {}", graph.nodes.len());
                 }
+                FastPathResult::DomainCandidate {
+                    graph,
+                    current_skeleton_hash,
+                } => {
+                    println!(
+                        "🔍 Domain Candidate: Graph '{}' (v{}), current skeleton hash: {}",
+                        graph.graph_id, graph.version, current_skeleton_hash
+                    );
+                }
                 FastPathResult::Miss { skeleton_hash } => {
                     println!("⚡ Cache MISS: Skeleton Hash {}", skeleton_hash);
                 }
             }
+        }
+        Commands::Serve { host, port, db } => {
+            let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+            let storage = Arc::new(ActionStorage::open(db)?);
+            server::run_server(addr, storage).await?;
         }
     }
 

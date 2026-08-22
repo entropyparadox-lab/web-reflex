@@ -6,7 +6,13 @@ use web_reflex_storage::ActionStorage;
 #[derive(Debug)]
 pub enum FastPathResult {
     Hit(ActionGraph),
-    Miss { skeleton_hash: String },
+    DomainCandidate {
+        graph: ActionGraph,
+        current_skeleton_hash: String,
+    },
+    Miss {
+        skeleton_hash: String,
+    },
 }
 
 #[derive(Debug)]
@@ -32,5 +38,27 @@ impl ReplayEngine {
         } else {
             Ok(FastPathResult::Miss { skeleton_hash })
         }
+    }
+
+    pub fn inspect_page_with_domain(
+        &self,
+        html: &str,
+        domain: Option<&str>,
+    ) -> Result<FastPathResult> {
+        let skeleton_hash = SkeletonHasher::compute_hash(html);
+        if let Some(graph) = self.storage.find_by_skeleton_hash(&skeleton_hash)? {
+            return Ok(FastPathResult::Hit(graph));
+        }
+
+        if let Some(dom) = domain {
+            if let Some(candidate) = self.storage.find_by_domain(dom)? {
+                return Ok(FastPathResult::DomainCandidate {
+                    graph: candidate,
+                    current_skeleton_hash: skeleton_hash,
+                });
+            }
+        }
+
+        Ok(FastPathResult::Miss { skeleton_hash })
     }
 }

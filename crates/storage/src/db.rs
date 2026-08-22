@@ -55,6 +55,7 @@ impl ActionStorage {
             INSERT INTO action_graphs (graph_id, domain_pattern, skeleton_hash, version, graph_json, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'), datetime('now'))
             ON CONFLICT(graph_id) DO UPDATE SET
+                domain_pattern = excluded.domain_pattern,
                 skeleton_hash = excluded.skeleton_hash,
                 version = excluded.version,
                 graph_json = excluded.graph_json,
@@ -78,6 +79,22 @@ impl ActionStorage {
         )?;
 
         let mut rows = stmt.query(params![hash])?;
+        if let Some(row) = rows.next()? {
+            let json_str: String = row.get(0)?;
+            let graph: ActionGraph = serde_json::from_str(&json_str)?;
+            Ok(Some(graph))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn find_by_domain(&self, domain: &str) -> Result<Option<ActionGraph>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT graph_json FROM action_graphs WHERE domain_pattern = ?1 ORDER BY version DESC LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query(params![domain])?;
         if let Some(row) = rows.next()? {
             let json_str: String = row.get(0)?;
             let graph: ActionGraph = serde_json::from_str(&json_str)?;
@@ -120,6 +137,10 @@ mod tests {
         let found = storage.find_by_skeleton_hash("hash_12345")?;
         assert!(found.is_some());
         assert_eq!(found.unwrap().graph_id, "test_login");
+
+        let found_domain = storage.find_by_domain("example.com")?;
+        assert!(found_domain.is_some());
+        assert_eq!(found_domain.unwrap().graph_id, "test_login");
 
         let not_found = storage.find_by_skeleton_hash("unknown_hash")?;
         assert!(not_found.is_none());
