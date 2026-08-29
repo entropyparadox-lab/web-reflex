@@ -110,6 +110,22 @@ impl ActionStorage {
             Ok(None)
         }
     }
+
+    pub fn list_all_graphs(&self) -> Result<Vec<ActionGraph>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT graph_json FROM action_graphs ORDER BY domain_pattern ASC, graph_id ASC",
+        )?;
+
+        let mut rows = stmt.query([])?;
+        let mut graphs = Vec::new();
+        while let Some(row) = rows.next()? {
+            let json_str: String = row.get(0)?;
+            let graph: ActionGraph = serde_json::from_str(&json_str)?;
+            graphs.push(graph);
+        }
+        Ok(graphs)
+    }
 }
 
 #[cfg(test)]
@@ -148,6 +164,9 @@ mod tests {
         let found_domain = storage.find_by_domain("example.com")?;
         assert!(found_domain.is_some());
         assert_eq!(found_domain.unwrap().graph_id, "test_login");
+
+        let all = storage.list_all_graphs()?;
+        assert_eq!(all.len(), 1);
 
         let not_found = storage.find_by_skeleton_hash("unknown_hash")?;
         assert!(not_found.is_none());

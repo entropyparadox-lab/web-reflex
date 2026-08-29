@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebReflex</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #4ade80;
+      --warning: #facc15;
+      --danger: #f87171;
+      --border: #334155;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+    }
+    h2 {
+      margin: 0 0 4px 0;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .status-badge {
+      display: inline-block;
+      font-weight: 600;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+    .status-hit { background: rgba(74, 222, 128, 0.15); color: var(--success); border: 1px solid rgba(74, 222, 128, 0.3); }
+    .status-miss { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .status-candidate { background: rgba(250, 204, 21, 0.15); color: var(--warning); border: 1px solid rgba(250, 204, 21, 0.3); }
+    
+    .hash-box {
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      word-break: break-all;
+      background: #090d16;
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin: 8px 0;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      margin-top: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: var(--primary); color: #0f172a; }
+    .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
+    .steps-list {
+      margin: 8px 0 0 0;
+      padding-left: 18px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .step-item { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h2>WebReflex <span class="badge">v0.1.0</span></h2>
+  <div style="color: var(--text-muted); font-size: 11px;">Deterministic Action Cache Controller</div>
+
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 600;">Status</span>
+      <span id="cacheStatus" class="status-badge status-miss">Checking...</span>
+    </div>
+    <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">Skeleton Hash:</div>
+    <div id="skeletonHash" class="hash-box">-</div>
+    <div id="recipeInfo" style="display: none; font-size: 12px; margin-top: 8px;">
+      <div>Recipe: <strong id="graphId" style="color: var(--primary);">-</strong> (<span id="graphVer">-</span>)</div>
+      <ol id="stepsList" class="steps-list"></ol>
+    </div>
+  </div>
+
+  <div style="margin-top: 12px;">
+    <button id="btnReplay" class="btn btn-primary" style="display: none;">⚡ Run Fast-Path Replay</button>
+    <button id="btnInspect" class="btn btn-secondary">🔄 Refresh & Inspect</button>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

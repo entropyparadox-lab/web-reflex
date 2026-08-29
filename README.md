@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org)
+[![npm](https://img.shields.io/badge/npm-%40entropyparadox%2Fweb--reflex-red.svg)](https://www.npmjs.com)
 [![Playwright](https://img.shields.io/badge/playwright-supported-green.svg)](https://playwright.dev)
 
 *Don't think every step. Just reflex.*
@@ -25,7 +26,7 @@ Traditional RPA and Playwright scripts run in **~40ms at $0 cost**, but **break 
 
 ```
 [Phase A: Cold Start (1st Run)]
-  Agent explores via LLM ──> Action Graph recorded & parameterized ($SLOTS)
+  Agent explores via LLM OR Developer uses `BrowserRecorder` ──> Recipe saved ($SLOTS)
 
 [Phase B: Warm Replay (Next 1,000+ Runs)]
   Page Skeleton Matched ──> Deterministic Playwright Replay (<45ms, $0 Token Cost)
@@ -100,20 +101,11 @@ cargo build --release
 
 ### 2. Python SDK & Playwright Integration
 
-Install the Python SDK:
-
-```bash
-cd python
-pip install -e .
-```
-
-Use `ReflexSession` with automated LLM self-healing:
-
 ```python
 from playwright.sync_api import sync_playwright
 from web_reflex import ReflexSession, create_llm_healer
 
-# Setup automated LLM repair helper (supports OpenAI / Anthropic / Local models)
+# Automated LLM repair helper (supports OpenAI / Anthropic)
 llm_healer = create_llm_healer(model="gpt-4o-mini", provider="openai")
 
 with sync_playwright() as p:
@@ -134,6 +126,38 @@ with sync_playwright() as p:
     browser.close()
 ```
 
+### 3. TypeScript / Node.js SDK
+
+```typescript
+import { chromium } from "playwright";
+import { ReflexSession } from "@entropyparadox/web-reflex";
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("https://example-shop.com/checkout");
+
+const session = new ReflexSession(page, {
+  endpoint: "http://127.0.0.1:9199",
+});
+
+const result = await session.execute({
+  valueSlots: { COUPON: "SAVE50" },
+});
+console.log(`Status: ${result.status}, Elapsed: ${result.elapsedMs}ms`);
+```
+
+### 4. Git-Backed Team Recipe Sync
+
+Export and version-control your team's action graphs directly in Git:
+
+```bash
+# Export SQLite cache to pretty JSON files for Git commits
+./target/release/web-reflex export --out ./recipes
+
+# Import updated recipes into local SQLite on other team machines
+./target/release/web-reflex import --input ./recipes
+```
+
 ---
 
 ## 🛡️ Safety Gate: Read vs Write Isolation
@@ -147,40 +171,37 @@ WebReflex enforces strict safety levels on every action node:
 
 ---
 
-## 🔒 Privacy & Zero-PII Storage Model
-
-* **Structural Hashing**: The DOM Sanitizer strips dynamic styling hashes (`css-1a2b3c`, Tailwind runtime hashes), user emails, phone numbers, and session tokens before computing the page fingerprint.
-* **Variable Slotting**: Personal values (e.g., user credentials, search queries, payment amounts) must always be parameterized into `$SLOTS` and are injected only at client runtime.
-
----
-
 ## 🧪 Testing & Benchmark Results
 
 ```bash
 # 1. Run all Rust core/storage/engine tests
 cargo test --workspace
 
-# 2. Run Live Playwright E2E simulation (Fast-Path -> UI Mutation -> Self-Healing)
-pytest -v tests/test_live_playwright.py
+# 2. Run Python Playwright E2E & Browser Recorder tests
+pytest -v tests/
+
+# 3. Run TypeScript SDK tests
+cd typescript && node --test test/sdk.test.mjs
 ```
 
 ### Verified Benchmark Output
 
 ```text
-[Run 1] Fast-Path Hit:        44.66ms   (0 LLM tokens, 100% deterministic)
-[Run 2] Self-Healed to v2:   1,054.81ms (UI Mutation caught -> Healed via LLM hook -> DB v2)
-[Run 3] Direct v2 Hit:        41.57ms   (Direct fast-path replay on new layout)
+[Run 1] Fast-Path Hit:        40.06ms   (0 LLM tokens, 100% deterministic)
+[Run 2] Self-Healed to v2:   1,058.41ms (UI Mutation caught -> Healed via LLM hook -> DB v2)
+[Run 3] Direct v2 Hit:        40.80ms   (Direct fast-path replay on new layout)
 ```
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap & Current Status
 
 - [x] **v0.1.0 Core**: Rust DOM Sanitizer, Skeleton Hasher (SHA-256), SQLite Action Cache (WAL).
 - [x] **v0.1.0 Daemon & SDK**: Axum REST server, Python Playwright `ReflexSession`, Self-Healing Hand-off.
-- [ ] **v0.2.0 Extensions**: Chrome Extension SidePanel for visual 1-click recording & replay.
-- [ ] **v0.3.0 Ecosystem**: TypeScript / Node.js SDK for Stagehand & Browser-use plugins.
-- [ ] **v0.4.0 Team Sync**: End-to-end encrypted tenant sync for private enterprise backoffices.
+- [x] **v0.2.0 Interactive Recorder**: `BrowserRecorder` CLI for 1-click recipe capture.
+- [x] **v0.3.0 TypeScript SDK**: `@entropyparadox/web-reflex` native npm package.
+- [x] **v0.3.5 Git Sync**: `web-reflex export/import` for Git-versioned action repositories.
+- [x] **v0.4.0 Chrome Extension**: MV3 SidePanel visual inspector & replay trigger.
 
 ---
 

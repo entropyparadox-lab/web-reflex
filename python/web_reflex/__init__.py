@@ -7,12 +7,14 @@ from web_reflex.models import (
     SafetyLevel,
     SelectorChain,
 )
+from web_reflex.recorder import BrowserRecorder
 from web_reflex.session import ReflexSafetyError, ReflexSession
 
 __all__ = [
     "ReflexClient",
     "ReflexSession",
     "ReflexSafetyError",
+    "BrowserRecorder",
     "create_llm_healer",
     "ActionGraph",
     "ActionNode",

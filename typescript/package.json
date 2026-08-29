@@ -1,0 +1,38 @@
+{
+  "name": "@entropyparadox/web-reflex",
+  "version": "0.1.0",
+  "description": "Deterministic, instant (<45ms), and self-healing action cache for AI web agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  },
+  "keywords": [
+    "ai-agent",
+    "playwright",
+    "browser-use",
+    "stagehand",
+    "automation",
+    "web-reflex",
+    "cache"
+  ],
+  "author": "Cycorld <cycorld.com@gmail.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entropyparadox-lab/web-reflex.git"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.30.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  }
+}

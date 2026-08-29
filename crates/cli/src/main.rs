@@ -6,7 +6,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use web_reflex_core::SkeletonHasher;
+use web_reflex_core::{ActionGraph, SkeletonHasher};
 use web_reflex_engine::{FastPathResult, ReplayEngine};
 use web_reflex_storage::ActionStorage;
 
@@ -45,6 +45,24 @@ enum Commands {
         #[arg(short, long, default_value = "reflex.db")]
         db: PathBuf,
     },
+    /// Export all cached action graphs to JSON files for Git version control
+    Export {
+        /// Output directory
+        #[arg(short, long, default_value = "recipes")]
+        out: PathBuf,
+        /// SQLite database file path
+        #[arg(short, long, default_value = "reflex.db")]
+        db: PathBuf,
+    },
+    /// Import action graph JSON files into SQLite database
+    Import {
+        /// Input directory containing JSON recipes
+        #[arg(short, long, default_value = "recipes")]
+        input: PathBuf,
+        /// SQLite database file path
+        #[arg(short, long, default_value = "reflex.db")]
+        db: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -66,10 +84,7 @@ async fn main() -> Result<()> {
 
             match engine.inspect_page(&html)? {
                 FastPathResult::Hit(graph) => {
-                    println!(
-                        "🎯 Cache HIT: Graph '{}' (v{})",
-                        graph.graph_id, graph.version
-                    );
+                    println!("🎯 Cache HIT: Graph '{}' (v{})", graph.graph_id, graph.version);
                     println!("Nodes: {}", graph.nodes.len());
                 }
                 FastPathResult::DomainCandidate {
@@ -91,7 +106,56 @@ async fn main() -> Result<()> {
             let storage = Arc::new(ActionStorage::open(db)?);
             server::run_server(addr, storage).await?;
         }
+        Commands::Export { out, db } => {
+            let storage = ActionStorage::open(db)?;
+            let graphs = storage.list_all_graphs()?;
+            fs::create_dir_all(&out)?;
+
+            let mut count = 0;
+            for graph in graphs {
+                let domain_dir = out.join(&graph.domain_pattern);
+                fs::create_dir_all(&domain_dir)?;
+                let file_path = domain_dir.join(format!("{}.json", graph.graph_id));
+                let json_pretty = serde_json::to_string_pretty(&graph)?;
+                fs::write(&file_path, json_pretty)?;
+                count += 1;
+            }
+            println!("📦 Exported {} action recipes to {:?}", count, out);
+        }
+        Commands::Import { input, db } => {
+            let storage = ActionStorage::open(db)?;
+            let mut count = 0;
+
+            if input.exists() && input.is_dir() {
+                for entry in walk_dir(&input)? {
+                    if entry.extension().and_then(|s| s.to_str()) == Some("json") {
+                        let content = fs::read_to_string(&entry)?;
+                        if let Ok(graph) = serde_json::from_str::<ActionGraph>(&content) {
+                            storage.save_graph(&graph)?;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+            println!("📥 Imported {} action recipes into database", count);
+        }
     }
 
     Ok(())
+}
+
+fn walk_dir(dir: &std::path::Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(walk_dir(&path)?);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    Ok(files)
 }
