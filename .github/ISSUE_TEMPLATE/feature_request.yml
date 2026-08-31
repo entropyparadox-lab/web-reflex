@@ -1,0 +1,23 @@
+name: "💡 Feature Request"
+description: "Suggest a new self-healing strategy, SDK capability, or action cache optimization"
+title: "[RFC]: "
+labels: ["enhancement", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We welcome proposals for new DOM sanitizers, fast-path replay improvements, and LLM healing adapters!
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem / Motivation"
+      description: "Explain what limitation you are encountering."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Proposed Solution"
+      description: "Describe the desired engine behavior or SDK API."
+    validations:
+      required: true

@@ -1,0 +1,32 @@
+name: "🐛 Bug Report"
+description: "File an issue for a bug or unexpected behavior in WebReflex"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in WebReflex! Please ensure you have tested against the latest version.
+  - type: input
+    id: version
+    attributes:
+      label: "WebReflex Version & Environment"
+      description: "Rust / Python version and WebReflex commit or release tag."
+      placeholder: "WebReflex: v0.2.0, Rust: 1.80, Python: 3.12"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "Describe the bug"
+      description: "A clear and concise description of what happened."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Reproduction Steps or Code"
+      description: "Action graph reproduction script or minimal Playwright snippet."
+      render: python
+    validations:
+      required: true
