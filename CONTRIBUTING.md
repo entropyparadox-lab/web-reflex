@@ -1,4 +1,4 @@
-# Contributing to WebReflex
+# Contributing to WebReflex ⚡
 
 Thank you for your interest in contributing to WebReflex! 🎉
 
@@ -6,60 +6,33 @@ WebReflex is an open-source, deterministic, self-healing action cache and execut
 
 ---
 
-## 🛠️ Development Setup
+## 1. Branch Strategy & PR Workflow
+
+We follow **GitHub Flow** with a protected `main` branch:
+
+* **`main` (Protected)**: Production release branch. Direct push to `main` is prohibited; changes land only via reviewed Pull Requests.
+* **`feat/<name>` / `fix/<name>`**: Feature and bugfix branches (e.g. `feat/dom-sanitizer`, `fix/slot-inference`).
+* **`docs/<name>` / `perf/<name>`**: Documentation updates and performance optimizations.
+
+---
+
+## 2. Fast Local Git Hooks
+
+Install the local pre-commit and pre-push validation hooks:
+```bash
+./scripts/setup-hooks.sh
+```
+
+---
+
+## 3. Development Setup & Testing
 
 ### Prerequisites
-
 1. **Rust**: 1.80+ (stable toolchain)
 2. **Python**: 3.10+ (with `uv` or `pip`)
 3. **Playwright**: Installed for live browser integration testing
 
-### 1. Clone and Build Core Engine
-
-```bash
-git clone https://github.com/entropyparadox-lab/web-reflex.git
-cd web-reflex
-
-# Check and build Rust workspace
-cargo check --workspace
-cargo test --workspace
-```
-
-### 2. Setup Python SDK Environment
-
-We recommend using `uv` or `venv`:
-
-```bash
-# Create virtual environment and install dependencies
-uv venv .venv
-source .venv/bin/activate
-uv pip install -e "python[dev]"
-playwright install chromium
-```
-
----
-
-## 📁 Repository Organization
-
-```
-web-reflex/
-├── crates/
-│   ├── core/         # DOM Sanitizer, Skeleton Hasher (SHA-256), Models
-│   ├── storage/      # SQLite Action Graph Storage (WAL mode, rusqlite)
-│   ├── engine/       # Replay Engine, Safety Gate, Self-Healing Manager
-│   └── cli/          # web-reflex CLI & Local Axum HTTP Server
-├── python/           # Python SDK (web_reflex.ReflexSession, client, healers)
-├── tests/            # Live Playwright browser E2E test suite
-├── SPEC.md           # Architecture specifications & schema
-├── README.md         # Project documentation
-├── CONTRIBUTING.md   # Contribution guide
-└── LICENSE           # Apache-2.0
-```
-
----
-
-## 🧪 Running Tests & Quality Checks
-
+### Quality & Verification Commands
 Before submitting a Pull Request, ensure all tests and linter checks pass cleanly:
 
 ```bash
@@ -77,7 +50,7 @@ pytest -v tests/test_live_playwright.py
 
 ---
 
-## 📐 Architecture Principles & Guidelines
+## 4. Architecture Principles & Guidelines
 
 When writing code for WebReflex, please adhere to these core tenets:
 
@@ -88,18 +61,25 @@ When writing code for WebReflex, please adhere to these core tenets:
 
 ---
 
-## 🚀 Submitting a Pull Request
+## 5. Release & SemVer Policy
 
-1. **Fork the repository** and create a feature branch:
-   ```bash
-   git checkout -b feat/your-feature-name
-   ```
-2. **Commit your changes** with descriptive commit messages following Conventional Commits (e.g. `feat:`, `fix:`, `docs:`, `perf:`).
-3. **Push to your fork** and open a Pull Request against `main`.
-4. Include a clear summary of what changes were made and how they were tested.
+* **Semantic Versioning (SemVer 2.0.0)**:
+  * `PATCH`: Bug fixes, DOM healing edge cases, documentation.
+  * `MINOR`: New SDK bindings, engine capabilities, backwards-compatible additions.
+  * `MAJOR`: Breaking schema or Action Graph format changes.
+* **Tag Immutability**:
+  * Never delete or rewrite a published tag (`vX.Y.Z`).
 
 ---
 
-## 🔒 Reporting Security Issues
+## 6. Commit Message Format
 
-If you discover a security vulnerability or potential PII leak vector, please do **not** open a public GitHub issue. Instead, report it privately to the maintainers at `security@entropyparadox.com` or via GitHub Private Vulnerability Reporting.
+We strictly enforce **Conventional Commits**:
+```
+<type>(<scope>): <subject>
+
+Examples:
+  feat(engine): add subtree skeleton hashing
+  fix(storage): optimize WAL journal mode checkpoint
+  docs: add Python SDK quickstart recipe
+```
