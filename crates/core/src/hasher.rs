@@ -61,6 +61,22 @@ impl SkeletonHasher {
             buf.push(']');
         }
 
+        if let Some(state) = &elem.data_state {
+            buf.push_str("[state=");
+            buf.push_str(state);
+            buf.push(']');
+        }
+
+        if let Some(exp) = &elem.aria_expanded {
+            buf.push_str("[exp=");
+            buf.push_str(exp);
+            buf.push(']');
+        }
+
+        if elem.disabled {
+            buf.push_str("[disabled]");
+        }
+
         buf.push('>');
 
         for child in &elem.children {
@@ -92,9 +108,9 @@ mod tests {
         let html2 = r#"
             <div class="css-9z8y7x tw-flex">
                 <form id="login-form">
-                    <input type="text" name="username" value="other_person@gmail.com" class="input-primary _33aa1" />
+                    <input type="text" name="username" value="other_user@test.org" class="input-primary _34bc1" />
                     <input type="password" name="password" value="different_pwd" class="input-primary" />
-                    <button type="submit" aria-label="로그인 하기" class="css-btn-hovered btn-submit">로그인</button>
+                    <button type="submit" aria-label="로그인 하기" class="css-btn-other btn-submit">로그인</button>
                 </form>
             </div>
         "#;
@@ -104,25 +120,23 @@ mod tests {
 
         assert_eq!(
             hash1, hash2,
-            "Dynamic CSS and user values must not alter the skeleton hash!"
+            "Hashes should be identical despite dynamic classes and values"
         );
     }
 
     #[test]
     fn test_skeleton_hash_changes_on_structural_diff() {
         let html1 = r#"
-            <form id="login-form">
-                <input type="text" name="username" />
+            <div>
                 <button type="submit">Submit</button>
-            </form>
+            </div>
         "#;
 
         let html2 = r#"
-            <form id="login-form">
-                <input type="text" name="username" />
-                <input type="text" name="otp_code" />
+            <div>
+                <input type="text" name="extra" />
                 <button type="submit">Submit</button>
-            </form>
+            </div>
         "#;
 
         let hash1 = SkeletonHasher::compute_hash(html1);
@@ -130,7 +144,51 @@ mod tests {
 
         assert_ne!(
             hash1, hash2,
-            "Structural change must result in different skeleton hash!"
+            "Structural difference must yield different hashes"
+        );
+    }
+
+    #[test]
+    fn test_skeleton_hash_changes_on_modal_state_toggle() {
+        let modal_closed = r#"
+            <div role="dialog" data-state="closed" aria-expanded="false">
+                <form>
+                    <input type="text" name="order_id" />
+                    <button type="submit">Confirm</button>
+                </form>
+            </div>
+        "#;
+
+        let modal_open = r#"
+            <div role="dialog" data-state="open" aria-expanded="true">
+                <form>
+                    <input type="text" name="order_id" />
+                    <button type="submit">Confirm</button>
+                </form>
+            </div>
+        "#;
+
+        let hash_closed = SkeletonHasher::compute_hash(modal_closed);
+        let hash_open = SkeletonHasher::compute_hash(modal_open);
+
+        assert_ne!(
+            hash_closed, hash_open,
+            "data-state='closed' vs 'open' must yield different skeleton hashes to prevent modal action collision"
+        );
+    }
+
+    #[test]
+    fn test_skeleton_hash_changes_on_disabled_state() {
+        let button_enabled = r#"<button type="submit" class="btn-primary">Submit</button>"#;
+        let button_disabled =
+            r#"<button type="submit" disabled class="btn-primary">Submit</button>"#;
+
+        let hash_enabled = SkeletonHasher::compute_hash(button_enabled);
+        let hash_disabled = SkeletonHasher::compute_hash(button_disabled);
+
+        assert_ne!(
+            hash_enabled, hash_disabled,
+            "Enabled vs disabled button states must yield distinct hashes"
         );
     }
 }
