@@ -25,6 +25,9 @@ pub struct SanitizedElement {
     pub aria_label: Option<String>,
     pub clean_id: Option<String>,
     pub clean_classes: Vec<String>,
+    pub data_state: Option<String>,
+    pub aria_expanded: Option<String>,
+    pub disabled: bool,
     pub children: Vec<SanitizedElement>,
 }
 
@@ -87,6 +90,23 @@ impl DomSanitizer {
                     clean_classes.sort();
                 }
 
+                // Capture semantic UI state (Radix/shadcn data-state, aria-expanded, disabled)
+                let data_state = elem
+                    .attr("data-state")
+                    .or_else(|| elem.attr("data-expanded"))
+                    .or_else(|| elem.attr("data-selected"))
+                    .or_else(|| elem.attr("data-checked"))
+                    .map(|s| s.to_string());
+
+                let aria_expanded = elem
+                    .attr("aria-expanded")
+                    .or_else(|| elem.attr("aria-selected"))
+                    .or_else(|| elem.attr("aria-checked"))
+                    .map(|s| s.to_string());
+
+                let disabled =
+                    elem.attr("disabled").is_some() || elem.attr("aria-disabled") == Some("true");
+
                 let mut children = Vec::new();
                 for child_ref in node.children() {
                     if let Some(child_elem) = Self::process_node(&child_ref) {
@@ -99,7 +119,10 @@ impl DomSanitizer {
                     tag.as_str(),
                     "button" | "input" | "select" | "option" | "textarea" | "a" | "form"
                 ) || role.is_some()
-                    || aria_label.is_some();
+                    || aria_label.is_some()
+                    || data_state.is_some()
+                    || aria_expanded.is_some()
+                    || disabled;
 
                 if !is_interactive
                     && clean_classes.is_empty()
@@ -117,6 +140,9 @@ impl DomSanitizer {
                     aria_label,
                     clean_id,
                     clean_classes,
+                    data_state,
+                    aria_expanded,
+                    disabled,
                     children,
                 })
             }
