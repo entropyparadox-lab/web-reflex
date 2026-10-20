@@ -61,6 +61,7 @@ class ActionGraph:
     skeleton_hash: str
     version: int
     nodes: List[ActionNode]
+    tenant_id: str = "default"
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ActionGraph":
@@ -70,4 +71,5 @@ class ActionGraph:
             skeleton_hash=data["skeleton_hash"],
             version=data["version"],
             nodes=[ActionNode.from_dict(n) for n in data["nodes"]],
+            tenant_id=data.get("tenant_id", "default"),
         )

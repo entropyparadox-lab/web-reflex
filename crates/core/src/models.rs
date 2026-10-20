@@ -84,8 +84,14 @@ pub struct ActionNode {
     pub post_condition: Option<PostCondition>,
 }
 
+fn default_tenant_id() -> String {
+    "default".to_string()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionGraph {
+    #[serde(default = "default_tenant_id")]
+    pub tenant_id: String,
     pub graph_id: String,
     pub domain_pattern: String,
     pub skeleton_hash: String,

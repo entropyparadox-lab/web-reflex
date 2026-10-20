@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use web_reflex_core::{ActionGraph, SkeletonHasher};
 use web_reflex_engine::{FastPathResult, ReplayEngine};
-use web_reflex_storage::ActionStorage;
+use web_reflex_storage::{ActionStorage, TenantStoragePool};
 
 #[derive(Parser)]
 #[command(name = "web-reflex")]
@@ -41,9 +41,24 @@ enum Commands {
         /// Port to listen on
         #[arg(short, long, default_value_t = 9199)]
         port: u16,
-        /// SQLite database file path
-        #[arg(short, long, default_value = "reflex.db")]
-        db: PathBuf,
+        /// SQLite database file path (single-tenant mode)
+        #[arg(short, long)]
+        db: Option<PathBuf>,
+        /// SQLite databases directory (multi-tenant mode)
+        #[arg(long)]
+        db_dir: Option<PathBuf>,
+        /// Optional API Key for bearer token authentication
+        #[arg(long)]
+        api_key: Option<String>,
+    },
+    /// Migrate SQLite database schemas to the latest version
+    Migrate {
+        /// SQLite database file path (single-tenant mode)
+        #[arg(short, long)]
+        db: Option<PathBuf>,
+        /// SQLite databases directory (multi-tenant mode)
+        #[arg(long)]
+        db_dir: Option<PathBuf>,
     },
     /// Export all cached action graphs to JSON files for Git version control
     Export {
@@ -104,10 +119,41 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Serve { host, port, db } => {
+        Commands::Serve {
+            host,
+            port,
+            db,
+            db_dir,
+            api_key,
+        } => {
             let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
-            let storage = Arc::new(ActionStorage::open(db)?);
-            server::run_server(addr, storage).await?;
+            let pool = if let Some(dir) = db_dir {
+                Arc::new(TenantStoragePool::new_directory(dir)?)
+            } else {
+                let db_path = db.unwrap_or_else(|| PathBuf::from("reflex.db"));
+                let storage = Arc::new(ActionStorage::open(db_path)?);
+                Arc::new(TenantStoragePool::new_single(storage))
+            };
+            let api_key = api_key.or_else(|| std::env::var("REFLEX_API_KEY").ok());
+            server::run_server(addr, pool, api_key).await?;
+        }
+        Commands::Migrate { db, db_dir } => {
+            let pool = if let Some(dir) = db_dir {
+                TenantStoragePool::new_directory(dir)?
+            } else {
+                let db_path = db.unwrap_or_else(|| PathBuf::from("reflex.db"));
+                let storage = Arc::new(ActionStorage::open(db_path)?);
+                TenantStoragePool::new_single(storage)
+            };
+            println!(
+                "🔄 Running SQLite schema migrations to v{}...",
+                web_reflex_storage::CURRENT_SCHEMA_VERSION
+            );
+            let results = pool.migrate_all()?;
+            for (tenant, version) in &results {
+                println!("  ✅ Tenant '{}': schema v{}", tenant, version);
+            }
+            println!("🎉 Migrated {} database(s) successfully.", results.len());
         }
         Commands::Export { out, db } => {
             let storage = ActionStorage::open(db)?;

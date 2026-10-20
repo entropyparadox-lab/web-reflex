@@ -34,6 +34,7 @@ export interface ActionNode {
 }
 
 export interface ActionGraph {
+  tenant_id?: string;
   graph_id: string;
   domain_pattern: string;
   skeleton_hash: string;
@@ -41,6 +42,16 @@ export interface ActionGraph {
   nodes: ActionNode[];
   created_at?: string;
   updated_at?: string;
+}
+
+export interface GraphHistoryEntry {
+  history_id: number;
+  graph_id: string;
+  version: number;
+  domain_pattern: string;
+  skeleton_hash: string;
+  graph_json: string;
+  archived_at: string;
 }
 
 export type InspectStatus = "hit" | "candidate" | "miss";

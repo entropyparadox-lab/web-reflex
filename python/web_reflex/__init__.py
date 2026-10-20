@@ -1,5 +1,5 @@
 from web_reflex.client import ReflexClient
-from web_reflex.healers import create_llm_healer
+from web_reflex.healers import create_llm_healer, redact_sensitive_html
 from web_reflex.models import (
     ActionGraph,
     ActionNode,
@@ -24,6 +24,7 @@ def get_recorder():
 __all__ = [
     "ReflexClient",
     "create_llm_healer",
+    "redact_sensitive_html",
     "ActionGraph",
     "ActionNode",
     "ActionType",

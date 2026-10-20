@@ -26,6 +26,7 @@ fn test_end_to_end_fast_path_and_self_healing() -> Result<()> {
 
     // 2. Pre-seed Action Graph (Simulating recorded user recipe)
     let initial_graph = ActionGraph {
+        tenant_id: "default".to_string(),
         graph_id: "checkout_flow".to_string(),
         domain_pattern: "shop.com/checkout".to_string(),
         skeleton_hash: initial_hash.clone(),

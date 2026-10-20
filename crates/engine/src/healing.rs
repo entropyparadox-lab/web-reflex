@@ -144,6 +144,7 @@ mod tests {
         let manager = SelfHealingManager::new(storage.clone());
 
         let graph = ActionGraph {
+            tenant_id: "default".to_string(),
             graph_id: "checkout".to_string(),
             domain_pattern: "shop.com".to_string(),
             skeleton_hash: "hash_xyz".to_string(),
