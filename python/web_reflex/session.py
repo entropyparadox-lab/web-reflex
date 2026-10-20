@@ -16,9 +16,11 @@ class ReflexSession:
         endpoint: str = "http://127.0.0.1:9199",
         approval_callback: Optional[Callable[[ActionNode], bool]] = None,
         llm_healer: Optional[Callable[[Dict[str, Any]], str]] = None,
+        api_key: Optional[str] = None,
+        tenant_id: Optional[str] = None,
     ):
         self.page = page
-        self.client = ReflexClient(endpoint)
+        self.client = ReflexClient(endpoint, api_key=api_key, tenant_id=tenant_id)
         self.approval_callback = approval_callback
         self.llm_healer = llm_healer
 
