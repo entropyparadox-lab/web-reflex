@@ -192,6 +192,20 @@ console.log(`Status: ${result.status}, Version: ${result.version}, Elapsed: ${re
   ```
 * `redact_sensitive_html` automatically masks credit card numbers, emails, phone numbers, and password input fields.
 
+### 6. Real-time Telemetry, Heal Snapshots & Stats Dashboard
+* **Zero-I/O Tracing**: Daemon outputs structured one-line telemetry to stdout for instant `journalctl -u web-reflex.service -f` observability:
+  ```text
+  [INFO] tenant=default domain=shop.com action=INSPECT status=HIT graph=checkout v=1 elapsed=31.20ms
+  [WARN] tenant=acme domain=shop.com action=HEAL status=HEALED graph=checkout v=1->2 step=pay_btn new_sel="#pay_v2" elapsed=842.10ms
+  ```
+* **Database-Native Heal Snapshots**:
+  * Instead of polluting the filesystem with unversioned JSON files, self-healing events are captured in the tenant's `heal_snapshots` SQLite ring-buffer (latest 500 per graph) with PII-redacted snippets.
+* **Persistent Performance Dashboard**:
+  ```bash
+  web-reflex stats --db-dir ./tenants
+  ```
+  Reports cumulative cache hits, total token savings, and recent self-heal events per tenant without losing counts across daemon restarts.
+
 ---
 
 ## 🛡️ Safety Gate: Read vs Write Isolation

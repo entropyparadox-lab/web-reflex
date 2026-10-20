@@ -60,6 +60,15 @@ enum Commands {
         #[arg(long)]
         db_dir: Option<PathBuf>,
     },
+    /// View usage metrics, cache hit rate, and self-healing telemetry
+    Stats {
+        /// SQLite database file path (single-tenant mode)
+        #[arg(short, long)]
+        db: Option<PathBuf>,
+        /// SQLite databases directory (multi-tenant mode)
+        #[arg(long)]
+        db_dir: Option<PathBuf>,
+    },
     /// Export all cached action graphs to JSON files for Git version control
     Export {
         /// Output directory
@@ -82,7 +91,12 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
     let cli = Cli::parse();
 
     match cli.command {
@@ -154,6 +168,48 @@ async fn main() -> Result<()> {
                 println!("  ✅ Tenant '{}': schema v{}", tenant, version);
             }
             println!("🎉 Migrated {} database(s) successfully.", results.len());
+        }
+        Commands::Stats { db, db_dir } => {
+            let pool = if let Some(dir) = db_dir {
+                TenantStoragePool::new_directory(dir)?
+            } else {
+                let db_path = db.unwrap_or_else(|| PathBuf::from("reflex.db"));
+                let storage = Arc::new(ActionStorage::open(db_path)?);
+                TenantStoragePool::new_single(storage)
+            };
+
+            let all_stats = pool.get_all_stats()?;
+            println!("============================================================");
+            println!("📊 WebReflex Telemetry & Action Cache Performance Stats");
+            println!("============================================================");
+
+            for stats in all_stats {
+                println!("\n🏢 Tenant: {}", stats.tenant_id);
+                println!("  • Cached Action Recipes: {}", stats.total_graphs);
+                println!("  • Cumulative Cache Hits:  {}", stats.total_hits);
+                println!(
+                    "  • Estimated Tokens Saved: ~{} tokens (${:.3} equivalent)",
+                    stats.estimated_tokens_saved,
+                    (stats.estimated_tokens_saved as f64 / 1_000_000.0) * 0.15
+                );
+                println!("  • Total Self-Heal Events: {}", stats.total_heals);
+
+                if !stats.recent_heals.is_empty() {
+                    println!("  • Recent Self-Healing History:");
+                    for heal in &stats.recent_heals {
+                        println!(
+                            "    [{}] Graph '{}' (v{}) | Step: '{}' | {} -> {}",
+                            heal.created_at,
+                            heal.graph_id,
+                            heal.version,
+                            heal.step_id,
+                            heal.old_selector,
+                            heal.new_selector,
+                        );
+                    }
+                }
+            }
+            println!("\n============================================================");
         }
         Commands::Export { out, db } => {
             let storage = ActionStorage::open(db)?;

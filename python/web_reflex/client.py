@@ -106,3 +106,12 @@ class ReflexClient:
         )
         resp.raise_for_status()
         return ActionGraph.from_dict(resp.json()["graph"])
+
+    def get_stats(self) -> Dict[str, Any]:
+        resp = requests.get(
+            f"{self.endpoint}/api/v1/stats",
+            headers=self._headers(),
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return resp.json()

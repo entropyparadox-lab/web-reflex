@@ -256,5 +256,68 @@ def test_cli_migrate_command(enterprise_daemon):
         text=True,
         check=True,
     )
-    assert "Running SQLite schema migrations to v2" in res.stdout
+    assert "Running SQLite schema migrations to v3" in res.stdout
     assert "Migrated" in res.stdout
+
+
+def test_telemetry_stats_and_heal_snapshot(enterprise_daemon):
+    endpoint = enterprise_daemon["endpoint"]
+    api_key = enterprise_daemon["api_key"]
+    binary_path = enterprise_daemon["binary_path"]
+    temp_dir = enterprise_daemon["temp_dir"]
+
+    client = ReflexClient(endpoint=endpoint, api_key=api_key, tenant_id="stats_tenant")
+
+    # 1. Record recipe with exact hash
+    skeleton_hash = client.hash_html("<html><body>test</body></html>")
+    graph = {
+        "graph_id": "stats_flow",
+        "domain_pattern": "stats.com",
+        "skeleton_hash": skeleton_hash,
+        "version": 1,
+        "nodes": [
+            {
+                "step_id": "click_btn",
+                "action_type": "click",
+                "safety_level": "read_only",
+                "requires_approval": False,
+                "target": {"primary": "#btn_v1", "fallbacks": []},
+            }
+        ],
+    }
+    client.record(graph)
+
+    # 2. Inspect hit (should record hit_count)
+    status, _, _ = client.inspect("<html><body>test</body></html>", domain="stats.com")
+    assert status == "hit"
+
+    # 3. Heal (should record heal snapshot)
+    healed = client.heal(
+        graph,
+        step_id="click_btn",
+        new_primary_selector="#btn_v2",
+        new_skeleton_hash="hash_stats_v2",
+    )
+    assert healed.version == 2
+
+    # 4. Check stats via API
+    stats = client.get_stats()
+    assert stats["tenant_id"] == "stats_tenant"
+    assert stats["total_graphs"] == 1
+    assert stats["total_hits"] >= 1
+    assert stats["total_heals"] == 1
+    assert len(stats["recent_heals"]) == 1
+    assert stats["recent_heals"][0]["new_selector"] == "#btn_v2"
+
+    # 5. Check stats CLI command
+    stats_res = subprocess.run(
+        [str(binary_path), "stats", "--db-dir", temp_dir],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "WebReflex Telemetry & Action Cache Performance Stats" in stats_res.stdout
+    assert "stats_tenant" in stats_res.stdout
+    assert "Cumulative Cache Hits" in stats_res.stdout
+    assert "Total Self-Heal Events" in stats_res.stdout
+
