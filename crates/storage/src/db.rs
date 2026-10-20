@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use web_reflex_core::ActionGraph;
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+pub const CURRENT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GraphHistoryEntry {
@@ -17,6 +17,28 @@ pub struct GraphHistoryEntry {
     pub skeleton_hash: String,
     pub graph_json: String,
     pub archived_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HealSnapshot {
+    pub snapshot_id: i64,
+    pub graph_id: String,
+    pub version: u32,
+    pub step_id: String,
+    pub old_selector: String,
+    pub new_selector: String,
+    pub diff_snippet: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorageStats {
+    pub tenant_id: String,
+    pub total_graphs: usize,
+    pub total_hits: u64,
+    pub estimated_tokens_saved: u64,
+    pub total_heals: usize,
+    pub recent_heals: Vec<HealSnapshot>,
 }
 
 pub struct ActionStorage {
@@ -88,6 +110,37 @@ impl ActionStorage {
             )?;
         }
 
+        if current_version < 3 {
+            let has_hit_count: bool = conn
+                .prepare("SELECT hit_count FROM action_graphs LIMIT 1")
+                .is_ok();
+            if !has_hit_count {
+                conn.execute_batch(
+                    "
+                    ALTER TABLE action_graphs ADD COLUMN hit_count INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE action_graphs ADD COLUMN last_hit_at TEXT;
+                    ",
+                )?;
+            }
+
+            conn.execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS heal_snapshots (
+                    snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    graph_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    step_id TEXT NOT NULL,
+                    old_selector TEXT NOT NULL,
+                    new_selector TEXT NOT NULL,
+                    diff_snippet TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_heal_snapshots_graph ON heal_snapshots(graph_id, version);
+                PRAGMA user_version = 3;
+                ",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -95,6 +148,113 @@ impl ActionStorage {
         let conn = self.conn.lock().unwrap();
         let version: u32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         Ok(version)
+    }
+
+    pub fn record_hit(&self, graph_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE action_graphs SET hit_count = hit_count + 1, last_hit_at = datetime('now') WHERE graph_id = ?1",
+            params![graph_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn save_heal_snapshot(
+        &self,
+        graph_id: &str,
+        version: u32,
+        step_id: &str,
+        old_selector: &str,
+        new_selector: &str,
+        diff_snippet: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "
+            INSERT INTO heal_snapshots (graph_id, version, step_id, old_selector, new_selector, diff_snippet, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
+            ",
+            params![graph_id, version, step_id, old_selector, new_selector, diff_snippet],
+        )?;
+
+        // Ring buffer prune: keep latest 500 snapshots per graph
+        conn.execute(
+            "
+            DELETE FROM heal_snapshots
+            WHERE graph_id = ?1 AND snapshot_id NOT IN (
+                SELECT snapshot_id FROM heal_snapshots WHERE graph_id = ?1 ORDER BY snapshot_id DESC LIMIT 500
+            )
+            ",
+            params![graph_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_recent_heals(&self, limit: usize) -> Result<Vec<HealSnapshot>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT snapshot_id, graph_id, version, step_id, old_selector, new_selector, diff_snippet, created_at
+             FROM heal_snapshots
+             ORDER BY snapshot_id DESC
+             LIMIT ?1",
+        )?;
+        let mut rows = stmt.query(params![limit as i64])?;
+        let mut snapshots = Vec::new();
+        while let Some(row) = rows.next()? {
+            snapshots.push(HealSnapshot {
+                snapshot_id: row.get(0)?,
+                graph_id: row.get(1)?,
+                version: row.get(2)?,
+                step_id: row.get(3)?,
+                old_selector: row.get(4)?,
+                new_selector: row.get(5)?,
+                diff_snippet: row.get(6)?,
+                created_at: row.get(7)?,
+            });
+        }
+        Ok(snapshots)
+    }
+
+    pub fn get_stats(&self, tenant_id: &str) -> Result<StorageStats> {
+        let conn = self.conn.lock().unwrap();
+        let (total_graphs, total_hits): (usize, u64) = conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(hit_count), 0) FROM action_graphs",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        let total_heals: usize =
+            conn.query_row("SELECT COUNT(*) FROM heal_snapshots", [], |row| row.get(0))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT snapshot_id, graph_id, version, step_id, old_selector, new_selector, diff_snippet, created_at
+             FROM heal_snapshots
+             ORDER BY snapshot_id DESC
+             LIMIT 5",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut recent_heals = Vec::new();
+        while let Some(row) = rows.next()? {
+            recent_heals.push(HealSnapshot {
+                snapshot_id: row.get(0)?,
+                graph_id: row.get(1)?,
+                version: row.get(2)?,
+                step_id: row.get(3)?,
+                old_selector: row.get(4)?,
+                new_selector: row.get(5)?,
+                diff_snippet: row.get(6)?,
+                created_at: row.get(7)?,
+            });
+        }
+
+        Ok(StorageStats {
+            tenant_id: tenant_id.to_string(),
+            total_graphs,
+            total_hits,
+            estimated_tokens_saved: total_hits * 1500,
+            total_heals,
+            recent_heals,
+        })
     }
 
     pub fn save_graph(&self, graph: &ActionGraph) -> Result<()> {
@@ -380,6 +540,38 @@ impl TenantStoragePool {
             }
         }
     }
+
+    pub fn get_all_stats(&self) -> Result<Vec<StorageStats>> {
+        match self {
+            Self::Single(storage) => {
+                let stats = storage.get_stats("default")?;
+                Ok(vec![stats])
+            }
+            Self::Directory { base_dir, .. } => {
+                let mut results = Vec::new();
+                for entry in std::fs::read_dir(base_dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("db") {
+                        let stem = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown");
+                        let storage = self.get_storage(Some(stem))?;
+                        results.push(storage.get_stats(stem)?);
+                    }
+                }
+
+                if results.is_empty() {
+                    let default_storage = self.get_storage(Some("default"))?;
+                    results.push(default_storage.get_stats("default")?);
+                }
+
+                results.sort_by(|a, b| a.tenant_id.cmp(&b.tenant_id));
+                Ok(results)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -512,13 +704,45 @@ mod tests {
         let migrations = pool.migrate_all()?;
         assert!(migrations
             .iter()
-            .any(|(name, ver)| name == "customer-a" && *ver == 2));
+            .any(|(name, ver)| name == "customer-a" && *ver == CURRENT_SCHEMA_VERSION));
         assert!(migrations
             .iter()
-            .any(|(name, ver)| name == "customer-b" && *ver == 2));
+            .any(|(name, ver)| name == "customer-b" && *ver == CURRENT_SCHEMA_VERSION));
 
         // Clean up
         let _ = std::fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_record_hit_and_heal_snapshots_stats() -> Result<()> {
+        let storage = ActionStorage::in_memory()?;
+        let g = make_test_graph("flow_stats", 1, "#btn");
+        storage.save_graph(&g)?;
+
+        // Hit recording
+        storage.record_hit("flow_stats")?;
+        storage.record_hit("flow_stats")?;
+
+        // Heal snapshot
+        storage.save_heal_snapshot(
+            "flow_stats",
+            2,
+            "step_1",
+            "#btn",
+            "#btn_v2",
+            "<button id=\"btn_v2\">Pay</button>",
+        )?;
+
+        let stats = storage.get_stats("test_tenant")?;
+        assert_eq!(stats.tenant_id, "test_tenant");
+        assert_eq!(stats.total_graphs, 1);
+        assert_eq!(stats.total_hits, 2);
+        assert_eq!(stats.estimated_tokens_saved, 3000);
+        assert_eq!(stats.total_heals, 1);
+        assert_eq!(stats.recent_heals.len(), 1);
+        assert_eq!(stats.recent_heals[0].new_selector, "#btn_v2");
+
         Ok(())
     }
 }

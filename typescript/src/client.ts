@@ -113,4 +113,13 @@ export class ReflexClient {
     const data = (await res.json()) as { status: string; graph: ActionGraph };
     return data.graph;
   }
+
+  async getStats(): Promise<any> {
+    const res = await fetch(`${this.endpoint}/api/v1/stats`, {
+      method: "GET",
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`GetStats failed: ${res.statusText}`);
+    return res.json();
+  }
 }
